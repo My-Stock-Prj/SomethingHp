@@ -60,6 +60,9 @@ def run_full_analysis():
     # 1. 데이터 로드 및 시계열 정렬
     full_df = pd.read_parquet(cfg.PATH_ADB_SUM).sort_values(['종목코드', '날짜'])
     
+    # [보강] 원본 데이터(ADB)의 종목코드도 매칭을 위해 6자리 문자열 표준화
+    full_df['종목코드'] = full_df['종목코드'].astype(str).str.replace(r'[^0-9]', '', regex=True).str.zfill(6)
+    
     for m_col in ['외국인순매수', '기관순매수', '기금순매수', '개인순매수']:
         full_df[f'{m_col}_3D'] = full_df.groupby('종목코드')[m_col].transform(lambda x: x.rolling(3).sum())
 
@@ -99,13 +102,14 @@ def run_full_analysis():
             if '종목코드' in my_port_data.columns:
                 print(f"🔍 [DEBUG] 전처리 전 종목코드 샘플: {my_port_data['종목코드'].head(3).tolist()}")
                 
-                # 수식 결과가 숫자로 넘어오면 5930.0 처럼 될 수 있으므로 처리
+                # [보강된 전처리 로직] 숫자 잘림, 수식 소수점, 특수문자 대응
                 my_port_data['종목코드'] = (
                     my_port_data['종목코드']
                     .astype(str)
-                    .str.replace(r'\.0$', '', regex=True) # 소수점 제거
+                    .str.replace(r'\.0$', '', regex=True)     # 소수점 제거 (660.0 -> 660)[cite: 2]
+                    .str.replace(r'[^0-9]', '', regex=True)   # 숫자 외 기호 제거 (백틱 등)[cite: 2]
                     .str.strip()
-                    .str.zfill(6)
+                    .str.zfill(6)                             # 6자리 맞춤 (660 -> 000660)[cite: 2]
                 )
                 print(f"🔍 [DEBUG] 전처리 후 종목코드 샘플: {my_port_data['종목코드'].head(3).tolist()}")
             else:
