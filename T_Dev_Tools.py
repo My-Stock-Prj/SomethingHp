@@ -227,7 +227,7 @@ def data_check(file_name=None):
         if date_cols:
             df = df.sort_values(by=date_cols[0], ascending=False)
         
-        # 최신 5개 행을 세로로 출력 (가독성 확보)[cite: 1]
+        # 최신 5개 행을 세로로 출력 (가독성 확보)
         print(df.head(5).T) 
         
     except Exception as e:
@@ -235,10 +235,63 @@ def data_check(file_name=None):
     
     print("=" * 60)
 
+# --- [Tool 4] Sector Schema Analyzer ---
+def analyze_sector_schema(file_name):
+    """
+    [Tool 4] Sector Schema Analyzer
+    - 파일 내 섹터 관련 칼럼(0/1 값)을 추출하여 터미널에 세로형으로 요약 출력
+    - 종목명, 코드 등 고유값 칼럼은 제외하고 실제 '섹터/상태' 칼럼만 분석
+    """
+    target_path = os.path.join(cfg.BASE_DIR, file_name)
+    if not os.path.exists(target_path):
+        print(f"❌ 파일을 찾을 수 없습니다: {target_path}")
+        return
+
+    print(f"\n" + "🔍" * 20)
+    print(f"📂 [Sector Analyzer] 대상 파일: {file_name}")
+    print(f"📡 분석 목적: 섹터별 데이터 분포 및 유효 값 확인")
+    print("🔍" * 20)
+
+    try:
+        df = pd.read_parquet(target_path)
+        
+        # 1. 제외할 칼럼 정의 (분석 노이즈 제거)
+        exclude_keywords = ['코드', '명', '일자', '날짜', '기준년월', '가격', '단가', '주수', '자본금', '매출', '이익', 'ROE']
+        
+        analysis_rows = []
+        for col in df.columns:
+            # 제외 키워드가 포함된 칼럼은 건너뜀
+            if any(key in col for key in exclude_keywords):
+                continue
+            
+            unique_values = sorted(df[col].dropna().unique().tolist())
+            value_counts = df[col].value_counts().to_dict()
+            
+            # 2. 섹터/상태 데이터 요약 생성
+            val_str = ", ".join([str(v) for v in unique_values])
+            
+            analysis_rows.append({
+                'Column Name': f"🏷️ {col}",
+                'Unique Values': val_str,
+                'Samples (Val:Count)': " | ".join([f"{v}:{c}" for v, c in value_counts.items()])
+            })
+
+        # 3. 세로형 출력
+        summary_df = pd.DataFrame(analysis_rows)
+        if summary_df.empty:
+            print("❗ 분석할 수 있는 섹터 관련 칼럼이 없습니다.")
+        else:
+            print(f"\n{summary_df.to_string(index=False)}")
+            
+        print(f"\n✅ 총 {len(analysis_rows)}개의 섹터/상태 칼럼이 분석되었습니다.")
+
+    except Exception as e:
+        print(f"⚠️ 분석 중 오류 발생: {e}")
+    print("=" * 60 + "\n")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Stock Project Dev Tools")
-    parser.get_default('mode')
-    parser.add_argument('--mode', type=str, choices=['map', 'sandbox', 'check'], default='map')
+    parser.add_argument('--mode', type=str, choices=['map', 'sandbox', 'check', 'sector'], default='map')
     parser.add_argument('--date', type=str, help='시뮬레이션 날짜 (YYYY-MM-DD)')
     parser.add_argument('--code', type=str, help='종목코드 (시뮬레이션 시 옵션)')
     parser.add_argument('--file', type=str, help='확인할 Parquet 파일명')
@@ -248,10 +301,12 @@ if __name__ == "__main__":
         generate_repo_map()
     elif args.mode == "sandbox":
         if not args.date:
-            # 날짜 미지정 시 오늘 날짜 기준으로 설정
             target_date = datetime.now().strftime("%Y-%m-%d")
             strategy_sandbox(target_date, args.code)
         else:
             strategy_sandbox(args.date, args.code)
     elif args.mode == "check":
         data_check(args.file)
+    elif args.mode == "sector":
+        target_file = args.file if args.file else "MST_KOSPI.parquet"
+        analyze_sector_schema(target_file)
