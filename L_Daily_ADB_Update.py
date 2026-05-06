@@ -87,6 +87,9 @@ def run_adb_update():
     df_main = df_main.sort_values(['날짜', '종목명'], ascending=[False, True])
     df_main.to_parquet(cfg.PATH_ADB_SUM, index=False, compression='snappy')
     
+    # [참조] 구글 시트 설정 (로직 내에서 파일 참조 시 사용 예시 - 현재는 로컬 DB 업데이트 위주)
+    # 실제 구글 시트 쓰기 로직이 필요한 경우 cfg.GS_FILE_ANALYZER 등을 활용합니다.
+    
     print(f"✅ ADB 업데이트 완료: 최근 {len(target_dates)}일 데이터 저장됨. (총 {len(df_main)}행)")
 
 if __name__ == "__main__":
