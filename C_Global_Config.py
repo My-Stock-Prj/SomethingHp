@@ -138,14 +138,14 @@ Sim_RPT_EXIT_RATIO     = 0.97
 
 # --- [5] L_Daily_ADB_Analyzer.py 관련 (VAL_ / ANA_) ---
 # 사후 검증 엔진 및 전략 보정용 파라미터[cite: 7]
-ANA_STRATEGY_VER   = "V4.1_Sector_Macro" # 분석에 사용된 현재 전략 버전
+ANA_STRATEGY_VER   = "V4.2_Sector_Macro" # 분석에 사용된 현재 전략 버전
 VAL_LOOKBACK_DAYS  = 20            # [수정] 충분한 표본 확보를 위해 20일로 조정[cite: 7]
 VAL_TARGET_D_DAYS  = [1, 3, 5]     # 추천 이후 성과 측정 기준일 (T+1, T+3, T+5)
 VAL_MIN_WIN_RATE   = 0.60          # 전략 신뢰도 임계치 (60% 미만 시 보정 제언)
 VAL_SIM_RANGE_PCT  = 0.10          # [수정] 미세 조정을 위해 10% 범위로 설정[cite: 7]
 
 # 🧪 [시뮬레이션 전용 파라미터 (Sim_)]
-Sim_ANA_STRATEGY_VER   = "Sim_V4.1_Test" 
+Sim_ANA_STRATEGY_VER   = "Sim_V4.2_Test" 
 Sim_VAL_LOOKBACK_DAYS  = 20            
 Sim_VAL_TARGET_D_DAYS  = [1, 3, 5]     
 Sim_VAL_MIN_WIN_RATE   = 0.60          
