@@ -52,29 +52,40 @@ def get_domestic_master_df(market_type):
     return pd.DataFrame(data)
 
 def refine_krx_data(df, market_label):
-    """마스터 DB 축약 및 정제"""
+    """마스터 DB 축약 및 정제 (복수 섹터 및 복수 상태정보 적용)[cite: 2]"""
     refined_list = []
+    # 지수 성격이 강한 KRX, KRX100, KRX300을 제외한 실제 산업 섹터 칼럼 추출[cite: 2, 3]
     sector_cols = [c for c in df.columns if 'KRX' in c and c not in ['KRX', 'KRX100', 'KRX300']]
 
     for _, row in df.iterrows():
-        main_sector = "기타"
+        # 1. 대표섹터 복수 수집 로직[cite: 2]
+        sector_list = []
         for s in sector_cols:
             if row[s] == '1':
-                main_sector = s.replace('KRX', '')
-                break
+                # Config의 MACRO_SECTOR_MAP과 일치시키기 위해 접두어 제거[cite: 2, 3]
+                clean_name = s.replace('KRX섹터_', '').replace('KRX', '').strip()
+                sector_list.append(clean_name)
         
+        main_sector = ", ".join(sector_list) if sector_list else "기타"
+        
+        # 2. 시장구분상세 로직 (기존 유지)[cite: 2]
         detail_market = "일반"
         if row.get('KOSPI200섹터업종') and row['KOSPI200섹터업종'] != '': detail_market = "KOSPI200"
         if row.get('KRX300') == '1': detail_market = "KRX300"
 
-        status = "정상"
-        if row.get('거래정지') == '1': status = "거래정지"
-        elif row.get('정리매매') == '1': status = "정리매매"
-        elif row.get('관리종목') == '1': status = "관리종목"
-        elif row.get('시장경고') != '0': status = "시장경고"
-        elif row.get('락구분') != '00': status = f"락({row['락구분']})"
-        elif row.get('증자구분') != '00': status = "증자"
-        elif row.get('액면변경') != '00': status = "액면변경"
+        # 3. 종목상태 복수 수집 로직[cite: 2]
+        status_list = []
+        if row.get('거래정지') == '1': status_list.append("거래정지")
+        if row.get('정리매매') == '1': status_list.append("정리매매")
+        if row.get('관리종목') == '1': status_list.append("관리종목")
+        if row.get('시장경고') and row.get('시장경고') != '0': status_list.append("시장경고")
+        if row.get('락구분') and row.get('락구분') != '00': status_list.append(f"락({row['락구분']})")
+        if row.get('증자구분') and row.get('증자구분') != '00': status_list.append("증자")
+        if row.get('액면변경') and row.get('액면변경') != '00': status_list.append("액면변경")
+        if row.get('공매도과열') == '1': status_list.append("공매도과열")
+        if row.get('이상급등') == '1': status_list.append("이상급등")
+
+        status = ", ".join(status_list) if status_list else "정상"
 
         refined_list.append({
             '단축코드': row['단축코드'],
@@ -103,7 +114,7 @@ def update_google_sheet_krx(df, sheet_name, tab_name):
         ws = sh.add_worksheet(title=tab_name, rows="5000", cols="20")
     
     ws.update([df.columns.values.tolist()] + df.fillna("").values.tolist())
-    note = "중요도 순서: 거래정지 > 정리매매 > 관리종목 > 시장경고 > 락/증자/액면변경.\n정상 이외의 상태는 분석 제외 권장."
+    note = "복수 상태 정보 포함: 거래정지, 관리종목, 시장경고 등 중첩 발생 가능.\n정상 이외의 상태는 분석 제외 권장."
     ws.update_notes({'F1': note})
     print(f"✅ [{sheet_name}] 파일의 [{tab_name}] 시트 업데이트 완료!")
 
@@ -131,5 +142,4 @@ if __name__ == "__main__":
     print(f"💾 통합 마스터 {cfg.PATH_MST} 저장 완료")
 
     # 6. 구글 시트 업데이트 (최신 GS_ 시스템 설정 적용)
-    # [설정 반영]: GS_FILE_USER_PORT("MyPortfolio") 파일의 GS_SHEET_ANA_KRX("KRX") 시트에 기록합니다.
     update_google_sheet_krx(df_krx_total, cfg.GS_FILE_USER_PORT, cfg.GS_SHEET_ANA_KRX)
