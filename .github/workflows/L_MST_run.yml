@@ -1,0 +1,52 @@
+# 이 코드는 L_MST_run.yml config 적용 버전
+name: Master_DB_Update
+
+on:
+  # schedule:
+  #   - cron: '0 21 * * *' # 한국 시간 오전 6시 (UTC 21:00)
+  workflow_dispatch:      # 수동 실행 버튼
+
+jobs:
+  update-master-db:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write     # 파일 수정을 위한 권한 필수
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4 # 최신 v4 권장
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5 # 최신 v5 권장
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # 마스터 업데이트에 필요한 라이브러리들
+          pip install pandas gspread google-auth requests pyarrow
+
+      - name: Run Master Update Script
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          # 한투 API 키가 마스터 수집 시 필요할 경우를 대비 (현 로직은 URL 직접 다운로드라 필수는 아님)
+          APP_KEY: ${{ secrets.APP_KEY }}
+          APP_SECRET: ${{ secrets.APP_SECRET }}
+        run: python L_Monthly_MST.py # ⚠️ 실제 파일명과 100% 일치해야 함
+
+      - name: Commit and Push Parquet Files
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # StockPrj0 폴더 내의 모든 마스터 관련 parquet 추가
+          git add StockPrj0/*.parquet
+          
+          # 변경사항 확인 및 푸시
+          if git diff --cached --quiet; then
+            echo "No changes in Master DB files."
+          else
+            git commit -m "Update Master DB Parquet: $(date +'%Y-%m-%d %H:%M:%S') [skip ci]"
+            git push origin main
+          fi
