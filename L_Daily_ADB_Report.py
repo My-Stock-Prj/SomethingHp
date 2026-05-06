@@ -4,12 +4,12 @@ import pandas as pd
 import numpy as np
 import os
 from datetime import datetime
-import C_Global_Config_3 as cfg
+import C_Global_Config as cfg
 import L_Daily_PQ as pq
 
 def get_macro_score():
     """
-    C_Global_Config_3.py의 MACRO_UP_LIMIT 및 WEIGHT 설정을 기반으로 지수 점수 계산
+    C_Global_Config.py의 MACRO_UP_LIMIT 및 WEIGHT 설정을 기반으로 지수 점수 계산
    
     """
     try:
@@ -29,7 +29,7 @@ def get_macro_score():
 
 def determine_stage(row):
     """
-    C_Global_Config_3.py Ver 4.2의 4단계 Waterfall 전략 적용
+    C_Global_Config.py Ver 4.2의 4단계 Waterfall 전략 적용
    
     """
     # 0. 기초 데이터 추출
