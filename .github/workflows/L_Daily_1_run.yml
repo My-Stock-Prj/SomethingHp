@@ -1,0 +1,76 @@
+# 이 코드의 파일명은 L_Daily_1_run.yml
+name: daily step 1
+
+on:
+  # 스케줄은 주석 처리 유지 (모바일/웹 수동 실행 전용)
+  # schedule:
+  #   - cron: '37 20 * * *' 
+  workflow_dispatch: 
+
+jobs:
+  update-stock-db:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # 전체 히스토리를 가져와야 push 충돌 시 rebase가 가능합니다.
+          fetch-depth: 0 
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # [NEW] pip 캐시 설정: requirements.txt 기반으로 라이브러리를 보관합니다.
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # [NEW] 라이브러리 설치: requirements.txt를 참조하여 효율적으로 설치합니다.
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run Integrated Update Script
+        env:
+          # [Secrets] 보안이 필요한 정보
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          APP_KEY: ${{ secrets.APP_KEY }}
+          APP_SECRET: ${{ secrets.APP_SECRET }}
+          KIS_BASE_URL: ${{ secrets.KIS_BASE_URL }}
+          
+          # [Variables] 유연한 설정이 필요한 정보
+          K_API_SLEEP: ${{ vars.K_API_SLEEP }}
+          TOP_N_KOSPI: ${{ vars.TOP_N_KOSPI }}
+          TOP_N_KOSDAQ: ${{ vars.TOP_N_KOSDAQ }}
+          BACKFILL_DAYS: ${{ vars.BACKFILL_DAYS }}
+        run: python L_Daily_PQ.py
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 변경사항 확인 및 커밋
+          git add StockPrj0/*.parquet
+          
+          # 변경사항이 없을 경우 에러로 종료되지 않도록 처리
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Auto-update stock database (Parquet) - v3 Test"
+            
+            # 원격의 최신 변경사항을 가져와서 내 작업물 아래에 깔아줌 (충돌 방지)
+            git pull --rebase origin main
+            
+            git push origin main
+          fi
