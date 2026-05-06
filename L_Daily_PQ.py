@@ -188,8 +188,9 @@ if __name__ == "__main__":
     krx = fdr.StockListing('KRX')
     
     try:
-        # 시트 이름 'TheList'를 명시적으로 지정하여 정확하게 읽어옵니다.
-        port_sh = client.open(cfg.RPT_PORTFOLIO_NAME).worksheet(cfg.RPT_SHEET_PORT)
+        # [최신화] cfg의 새로운 구글 시트 명명 규칙 반영
+        # GS_FILE_USER_PORT ("MyPortfolio") 파일에서 GS_SHEET_USER_LIST ("TheList") 시트를 읽어옵니다.
+        port_sh = client.open(cfg.GS_FILE_USER_PORT).worksheet(cfg.GS_SHEET_USER_LIST)
         port_codes = [format_code(row[0]) for row in port_sh.get_all_values()[1:] if row and row[0]]
 
     except Exception as e:
