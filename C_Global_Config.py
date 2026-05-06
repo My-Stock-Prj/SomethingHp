@@ -118,14 +118,14 @@ Sim_RPT_SHORT_RATIO    = 0.1
 Sim_RPT_CREDIT_LIMIT   = 8.0     
 
 # [Step 3] 수급(Supply)
-Sim_RPT_MAJOR_POWER    = 0.10    
+Sim_RPT_MAJOR_POWER    = 0.05    
 Sim_RPT_FND_DAYS       = 7       
-Sim_RPT_ANT_OUT_DAYS   = 4       
-Sim_RPT_AVG_PRICE_DEV  = 0.03    
+Sim_RPT_ANT_OUT_DAYS   = 2       
+Sim_RPT_AVG_PRICE_DEV  = 0.05    
 
 # [Step 4] 응축(Concentration)
-Sim_RPT_PRICE_POS      = 0.95    
-Sim_RPT_MAJOR_DAYS     = 5       
+Sim_RPT_PRICE_POS      = 0.90    
+Sim_RPT_MAJOR_DAYS     = 3       
 
 # [기타 진단/목표]
 Sim_RPT_VOL_EXPLOSION  = 3.8     
