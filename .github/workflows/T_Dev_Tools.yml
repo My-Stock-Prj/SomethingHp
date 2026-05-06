@@ -1,0 +1,103 @@
+# 이 코드의 파일명은 T_Dev_Tools.yml
+name: T_Dev_Tools_Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '실행 모드 (map: 레포맵 생성, sandbox: 전략 시뮬레이션, check: 데이터 확인)'
+        required: true
+        default: 'map'
+        type: choice
+        options:
+          - map
+          - sandbox
+          - check
+      target_date:
+        description: '시뮬레이션 타겟 날짜 (YYYY-MM-DD) - sandbox 모드 전용'
+        required: false
+        default: ''
+        type: string
+      target_code:
+        description: '시뮬레이션 종목코드 (6자리) - sandbox 모드 전용'
+        required: false
+        default: ''
+        type: string
+      target_file:
+        description: '확인할 Parquet 파일명 (예: ADB_Step_Tracker.parquet) - check 모드 전용'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  build_and_run:
+    runs-on: ubuntu-latest
+    env:
+      # 터미널 출력 즉시 확인을 위한 설정 및 API 관련 환경 변수[cite: 1, 4]
+      PYTHONUNBUFFERED: 1
+      BASE_DIR: "StockPrj0"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install pandas pyarrow fastparquet numpy
+
+      # [Tool 1, 2 & 3] 파이썬 스크립트 실행
+      # T_Dev_Tools.py의 인자 구성과 100% 일치하도록 설정[cite: 1, 2]
+      - name: Run Dev Tools
+        run: |
+          if [ "${{ github.event.inputs.mode }}" == "map" ]; then
+            python T_Dev_Tools.py --mode map
+          elif [ "${{ github.event.inputs.mode }}" == "sandbox" ]; then
+            python T_Dev_Tools.py --mode sandbox --date "${{ github.event.inputs.target_date }}" --code "${{ github.event.inputs.target_code }}"
+          elif [ "${{ github.event.inputs.mode }}" == "check" ]; then
+            if [ -n "${{ github.event.inputs.target_file }}" ]; then
+              python T_Dev_Tools.py --mode check --file "${{ github.event.inputs.target_file }}"
+            else
+              python T_Dev_Tools.py --mode check
+            fi
+          fi
+
+      # 생성된 분석 리포트를 5일간 보존 (repo_map.md 전용)
+      - name: Upload Repo Map Artifact
+        if: github.event.inputs.mode == 'map'
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-map-report
+          path: repo_map.md
+          retention-days: 5
+
+      # 실행 결과를 GitHub Step Summary에 기록
+      - name: Write Summary
+        if: always() # 실패하더라도 로그 확인을 위해 항상 실행
+        run: |
+          echo "## 🛠️ Dev Tools 실행 결과 (${{ github.event.inputs.mode }})" >> $GITHUB_STEP_SUMMARY
+          if [ -f "repo_map.md" ] && [ "${{ github.event.inputs.mode }}" == "map" ]; then
+            echo "### 🗺️ 프로젝트 맵 분석 완료" >> $GITHUB_STEP_SUMMARY
+            echo '```markdown' >> $GITHUB_STEP_SUMMARY
+            cat repo_map.md >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ github.event.inputs.mode }}" == "sandbox" ]; then
+            echo "### 🧪 Sandbox 시뮬레이션 완료" >> $GITHUB_STEP_SUMMARY
+            echo "- **타겟 날짜**: ${{ github.event.inputs.target_date }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **타겟 종목**: ${{ github.event.inputs.target_code }}" >> $GITHUB_STEP_SUMMARY
+            echo "---" >> $GITHUB_STEP_SUMMARY
+            echo "💡 로그(Run Dev Tools) 상단에서 T+1/3/5 성과 지표를 상세히 확인하세요." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ github.event.inputs.mode }}" == "check" ]; then
+            echo "### 🔍 Data Check 실행 완료" >> $GITHUB_STEP_SUMMARY
+            if [ -n "${{ github.event.inputs.target_file }}" ]; then
+              echo "- **확인 파일**: ${{ github.event.inputs.target_file }}" >> $GITHUB_STEP_SUMMARY
+              echo "💡 로그(Run Dev Tools) 하단에서 최신 5개 행의 상세 수치를 확인하세요." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **상태**: 파일 미지정 (목록 출력)" >> $GITHUB_STEP_SUMMARY
+              echo "💡 로그(Run Dev Tools)에서 사용 가능한 Parquet 파일 리스트를 확인하세요." >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
