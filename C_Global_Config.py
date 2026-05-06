@@ -64,16 +64,16 @@ GS_SHEET_TANA_TRACE = "T_Trace"           # T-사후 분석 데이터 기록 시
 GS_SHEET_USER_LIST  = "TheList"           # 사용자 보유 종목 리스트 시트
 
 # --- [하위 호환성 유지를 위한 기존 변수 매핑 (RPT_ / GS_)] ---
-RPT_GSHEET_NAME     = GS_FILE_REPORT
-RPT_PORTFOLIO_NAME  = GS_FILE_ANALYZER
-RPT_TRACE_SHEET     = GS_SHEET_ANA_TRACE
-RPT_SHEET_MAIN      = GS_SHEET_RPT_MAIN
-RPT_SHEET_PORT      = GS_SHEET_USER_LIST
-RPT_SHEET_KRX       = GS_SHEET_ANA_KRX
+# RPT_GSHEET_NAME     = GS_FILE_REPORT
+# RPT_PORTFOLIO_NAME  = GS_FILE_ANALYZER
+# RPT_TRACE_SHEET     = GS_SHEET_ANA_TRACE
+# RPT_SHEET_MAIN      = GS_SHEET_RPT_MAIN
+# RPT_SHEET_PORT      = GS_SHEET_USER_LIST
+# RPT_SHEET_KRX       = GS_SHEET_ANA_KRX
 
 # 기존 코드 호환용 별칭 (Deprecated 예정)
-GSHEET_NAME         = RPT_PORTFOLIO_NAME 
-RPT_SHEET_TITLE     = RPT_SHEET_MAIN
+# GSHEET_NAME         = RPT_PORTFOLIO_NAME 
+# RPT_SHEET_TITLE     = RPT_SHEET_MAIN
 
 
 # ⭐ [전략 파라미터] 리포트 판정 로직 제어 (20일 시계열 Waterfall 구조)[cite: 7]
