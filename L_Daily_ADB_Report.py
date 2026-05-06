@@ -117,7 +117,8 @@ def run_full_analysis():
     
     # 양매수 일수 (외인 > 0 & 기관 > 0)
     full_df['양매수_일수'] = full_df.groupby('종목코드').apply(
-        lambda x: ((x['외국인순매수'] > 0) & (x['기관순매수'] > 0)).rolling(20).sum()
+        lambda x: ((x['외국인순매수'] > 0) & (x['기관순매수'] > 0)).rolling(20).sum(),
+        include_groups=False
     ).reset_index(level=0, drop=True)
 
     # RS_SCORE_20 (간이 구현: 지수 대비 초과 수익률 일수)
@@ -182,7 +183,12 @@ def run_full_analysis():
         
         # 데이터 업데이트 로직 (생략 없이 규격대로 작성)
         wks.clear()
-        wks.update([report_display.columns.values.tolist()] + report_display.values.tolist())
+        report_display_json = report_display.copy()
+        # 모든 날짜형 칼럼을 문자열로 변환
+        for col in report_display_json.select_dtypes(include=['datetime64[ns]', 'datetime']).columns:
+        report_display_json[col] = report_display_json[col].dt.strftime('%Y-%m-%d')
+
+        wks.update([report_display_json.columns.values.tolist()] + report_display_json.values.tolist())
         print(f"✅ 구글 시트 '{cfg.GS_SHEET_RPT_MAIN}' 업데이트 완료")
         
     except Exception as e:
