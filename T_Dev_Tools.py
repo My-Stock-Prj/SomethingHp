@@ -71,11 +71,44 @@ def generate_repo_map():
     
     print(f"✅ {target_file} 가 성공적으로 생성/갱신되었습니다.")
 
-# --- [Tool 2] Strategy Sandbox (시뮬레이션 엔진 - 고도화 버전) ---
+# --- [Tool 2] Strategy Sandbox (시뮬레이션 엔진) ---
+import pandas as pd
+import numpy as np
+import os
+import C_Global_Config as cfg # 관례에 따른 설정 로드
+
 def strategy_sandbox(target_date, stock_code=None):
-    # (기존 데이터 로드 및 시계열 계산 로직 동일) ...[cite: 2]
+    """
+    [Tool 2] 전략 시뮬레이션 샌드박스 (고도화 버전)
+    - NameError 수정 및 Waterfall 정밀 분석 기능 통합
+    """
+    # 1. 데이터 로드 및 사전 준비
+    if not os.path.exists(cfg.PATH_ADB_SUM):
+        print(f"❌ 데이터 파일을 찾을 수 없습니다: {cfg.PATH_ADB_SUM}")[cite: 2]
+        return
+
+    full_df = pd.read_parquet(cfg.PATH_ADB_SUM).sort_values(['종목코드', '날짜'])[cite: 3]
+    target_dt = pd.to_datetime(target_date)
     
-    # [신규] 탈락 사유 추적을 위한 딕셔너리
+    # 분석일(D-1) 산출
+    available_dates = sorted(full_df[full_df['날짜'] < target_dt]['날짜'].unique())
+    if not available_dates:
+        print("❌ 시뮬레이션을 위한 과거 데이터가 부족합니다.")
+        return
+    d_minus_1 = available_dates[-1]
+
+    # 분석 대상 데이터프레임(df_d1) 먼저 정의 (오류 해결 핵심)[cite: 1]
+    df_d1 = full_df[full_df['날짜'] == d_minus_1].copy()
+    if stock_code:
+        df_d1 = df_d1[df_d1['종목코드'] == stock_code]
+
+    # 지표 계산 (필요한 칼럼: 거래대금, 기금순매수, 종가, 최고가 등)
+    # (효율을 위해 df_d1 대상으로만 계산)
+    full_df['거래대금_20평균'] = full_df.groupby('종목코드')['거래대금'].transform(lambda x: x.rolling(window=20).mean())
+    full_df['최고가_20일'] = full_df.groupby('종목코드')['종가'].transform(lambda x: x.rolling(window=20).max())
+    full_df['기금매수일수_20'] = full_df.groupby('종목코드')['기금순매수'].transform(lambda x: (x > 0).rolling(window=20).sum())
+
+    # 2. 탈락 사유 추적 시스템 (Waterfall Deep-Dive)
     fail_reasons = {
         "Step 1 (에너지)": 0,
         "Step 2 (세이프티)": 0,
@@ -85,13 +118,13 @@ def strategy_sandbox(target_date, stock_code=None):
     }
 
     def sim_determine_stage_v2(row):
-        # [Step 1] 에너지 (Energy)
+        # [Step 1] 에너지 (Energy) - Sim_RPT_VOL_INTENSITY 활용
         vol_intensity = row['거래대금'] / row['거래대금_20평균'] if row['거래대금_20평균'] > 0 else 0
         if vol_intensity < cfg.Sim_RPT_VOL_INTENSITY:
             fail_reasons["Step 1 (에너지)"] += 1
             return 1
         
-        # [Step 2] 세이프티 (Safety)
+        # [Step 2] 세이프티 (Safety) - Sim_RPT_RISK_LIMIT 활용[cite: 2]
         short_ratio = row['공매도수량'] / row['거래량'] if row['거래량'] > 0 else 0
         risk_score = 0
         if row['신용잔고율'] > cfg.Sim_RPT_CREDIT_LIMIT: risk_score += 5
@@ -100,16 +133,17 @@ def strategy_sandbox(target_date, stock_code=None):
             fail_reasons["Step 2 (세이프티)"] += 1
             return 2
         
-        # [Step 3] 수급 (Supply) - 상세 분리
+        # [Step 3] 수급 (Supply) - Sim_RPT_FND_DAYS 활용[cite: 2]
         if row['기금매수일수_20'] < cfg.Sim_RPT_FND_DAYS:
             fail_reasons["Step 3.1 (기금매수일수)"] += 1
             return 3
         
+        # 평단이격 (공매도평균단가 칼럼 사용)[cite: 3]
         if (row['종가'] / row['공매도평균단가']) > (1 + cfg.Sim_RPT_AVG_PRICE_DEV):
             fail_reasons["Step 3.2 (평단이격)"] += 1
             return 3.2
         
-        # [Step 4] 응축 (Concentration)
+        # [Step 4] 응축 (Concentration) - Sim_RPT_PRICE_POS 활용[cite: 2]
         price_pos = row['종가'] / row['최고가_20일'] if row['최고가_20일'] > 0 else 0
         if price_pos < cfg.Sim_RPT_PRICE_POS:
             fail_reasons["Step 4 (가격위치)"] += 1
@@ -117,32 +151,19 @@ def strategy_sandbox(target_date, stock_code=None):
         
         return 4 
 
-    # 분석 실행
+    # 판정 실행 (이제 df_d1이 정의된 상태임)[cite: 1]
     df_d1['Sim_Stage'] = df_d1.apply(sim_determine_stage_v2, axis=1)
-    
-    # (중략: 기존 결과 출력 로직) ...[cite: 2]
 
-    # [신규] 4. 전략 보정용 Waterfall 정밀 진단 출력
+    # 3. 결과 출력 및 진단
+    print(f"\n📊 [분석 기준: {d_minus_1.strftime('%Y-%m-%d')}]")
+    print(f"  ▶ Step 1 통과: {len(df_d1[df_d1['Sim_Stage'] > 1]):>5}개")
+    print(f"  ▶ [최종 추천]: {len(df_d1[df_d1['Sim_Stage'] == 4]):>5}개 🎯")
+
     print(f"\n🔍 [전략 변수별 필터링 강도 진단]")
-    print("-" * 50)
-    total_samples = len(df_d1)
     for reason, count in fail_reasons.items():
-        fail_pct = (count / total_samples) * 100
-        print(f"  - {reason:<20}: {count:>4}개 탈락 ({fail_pct:>5.1f}%)")
-    
-    print(f"\n💡 [상세 최적화 가이드]")
-    # 탈락 비중이 가장 높은 변수를 찾아 자동으로 조언 생성
-    max_fail_reason = max(fail_reasons, key=fail_reasons.get)
-    
-    if fail_reasons[max_fail_reason] > (total_samples * 0.5): # 50% 이상 탈락 시
-        if "기금매수일수" in max_fail_reason:
-            print(f"  ⚠️ [주의] 연기금 매집 조건이 매우 까다롭습니다. Sim_RPT_FND_DAYS({cfg.Sim_RPT_FND_DAYS})를 하향 검토하세요.")
-        elif "평단이격" in max_fail_reason:
-            print(f"  ⚠️ [주의] 메이저 평단과 너무 붙어있습니다. Sim_RPT_AVG_PRICE_DEV({cfg.Sim_RPT_AVG_PRICE_DEV})를 상향 검토하세요.")
-        elif "가격위치" in max_fail_reason:
-            print(f"  ⚠️ [주의] 신고가 근접 조건이 강합니다. Sim_RPT_PRICE_POS({cfg.Sim_RPT_PRICE_POS})를 0.90 수준으로 완화하세요.")
-    print("-" * 50)
-    
+        print(f"  - {reason:<20}: {count:>4}개 탈락")
+
+
 # --- [Tool 3] Data Check ---
 def data_check(file_name=None):
     """
