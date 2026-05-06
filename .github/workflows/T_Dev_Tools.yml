@@ -13,7 +13,7 @@ on:
           - map
           - sandbox
           - check
-          - sector  # [추가] Tool 4 섹터 분석 모드
+          - sector
       target_date:
         description: '시뮬레이션 타겟 날짜 (YYYY-MM-DD) - sandbox 모드 전용'
         required: false
@@ -34,7 +34,6 @@ jobs:
   build_and_run:
     runs-on: ubuntu-latest
     env:
-      # 터미널 출력 즉시 확인을 위한 설정 및 API 관련 환경 변수
       PYTHONUNBUFFERED: 1
       BASE_DIR: "StockPrj0"
 
@@ -51,8 +50,6 @@ jobs:
         run: |
           pip install pandas pyarrow fastparquet numpy
 
-      # [Tool 1, 2, 3 & 4] 파이썬 스크립트 실행
-      # T_Dev_Tools.py의 인자 구성과 100% 일치하도록 설정
       - name: Run Dev Tools
         run: |
           if [ "${{ github.event.inputs.mode }}" == "map" ]; then
@@ -73,7 +70,6 @@ jobs:
             fi
           fi
 
-      # 생성된 분석 리포트를 5일간 보존 (repo_map.md 전용)
       - name: Upload Repo Map Artifact
         if: github.event.inputs.mode == 'map'
         uses: actions/upload-artifact@v4
@@ -82,9 +78,8 @@ jobs:
           path: repo_map.md
           retention-days: 5
 
-      # 실행 결과를 GitHub Step Summary에 기록
       - name: Write Summary
-        if: always() # 실패하더라도 로그 확인을 위해 항상 실행
+        if: always()
         run: |
           echo "## 🛠️ Dev Tools 실행 결과 (${{ github.event.inputs.mode }})" >> $GITHUB_STEP_SUMMARY
           if [ -f "repo_map.md" ] && [ "${{ github.event.inputs.mode }}" == "map" ]; then
@@ -100,11 +95,13 @@ jobs:
             echo "💡 로그(Run Dev Tools) 상단에서 T+1/3/5 성과 지표를 상세히 확인하세요." >> $GITHUB_STEP_SUMMARY
           elif [ "${{ github.event.inputs.mode }}" == "check" ]; then
             echo "### 🔍 Data Check 실행 완료" >> $GITHUB_STEP_SUMMARY
-            echo "- **확인 파일**: ${{ github.event.inputs.target_file:-'전체 목록' }}" >> $GITHUB_STEP_SUMMARY
+            # 수정된 부분: || 연산자 사용
+            echo "- **확인 파일**: ${{ github.event.inputs.target_file || '전체 목록' }}" >> $GITHUB_STEP_SUMMARY
             echo "💡 로그(Run Dev Tools) 하단에서 최신 5개 행의 상세 수치를 확인하세요." >> $GITHUB_STEP_SUMMARY
           elif [ "${{ github.event.inputs.mode }}" == "sector" ]; then
             echo "### 📂 Sector Schema 분석 완료" >> $GITHUB_STEP_SUMMARY
-            echo "- **대상 파일**: ${{ github.event.inputs.target_file:-'MST_KOSPI.parquet' }}" >> $GITHUB_STEP_SUMMARY
+            # 수정된 부분: || 연산자 사용
+            echo "- **대상 파일**: ${{ github.event.inputs.target_file || 'MST_KOSPI.parquet' }}" >> $GITHUB_STEP_SUMMARY
             echo "---" >> $GITHUB_STEP_SUMMARY
             echo "💡 로그(Run Dev Tools)에서 섹터별 0/1 데이터 분포와 유효성 리포트를 확인하세요." >> $GITHUB_STEP_SUMMARY
           fi
