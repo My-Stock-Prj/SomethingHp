@@ -10,7 +10,6 @@ import L_Daily_PQ as pq
 def get_macro_score():
     """
     C_Global_Config.py의 MACRO_UP_LIMIT 및 WEIGHT 설정을 기반으로 지수 점수 계산
-   
     """
     try:
         idx_df = pd.read_parquet(cfg.PATH_INDEX)
@@ -21,7 +20,6 @@ def get_macro_score():
         latest = idx_df.iloc[-1]
         
         # 기본 점수 계산 (예시: 나스닥 및 필라델피아 반도체 지수 등락 활용)
-        # 실제 구현은 Config의 MACRO_WEIGHT_SOX 등을 참조하여 섹터별 가중치로 확장 가능
         return latest
     except Exception as e:
         print(f"⚠️ [Macro] 데이터 로드 실패: {e}")
@@ -30,7 +28,6 @@ def get_macro_score():
 def determine_stage(row):
     """
     C_Global_Config.py Ver 4.2의 4단계 Waterfall 전략 적용
-   
     """
     # 0. 기초 데이터 추출
     curr_vol = row.get('거래량', 0)
@@ -38,7 +35,6 @@ def determine_stage(row):
     short_ratio = (short_qty / curr_vol) if curr_vol > 0 else 0
     
     # [Step 1] 에너지(Energy): 시장 주도주 및 자금 유입 포착
-    # RPT_VOL_INTENSITY, RPT_VOLATILITY_3D, RPT_RS_SCORE_20 기준 적용
     avg_val_20 = row.get('거래대금_20평균', 1)
     vol_intensity = (row.get('거래대금', 0) / avg_val_20) if avg_val_20 > 0 else 0
     
@@ -51,7 +47,6 @@ def determine_stage(row):
         return 1, "Low Energy", short_ratio
 
     # [Step 2] 세이프티(Safety): 물리적 리스크 종목 제거
-    # RPT_CREDIT_LIMIT, RPT_SHORT_RATIO, RPT_RISK_LIMIT 기준 적용
     safety_pass = (
         (row.get('신용잔고율', 0) <= cfg.RPT_CREDIT_LIMIT) and 
         (short_ratio <= cfg.RPT_SHORT_RATIO) and
@@ -61,7 +56,6 @@ def determine_stage(row):
         return 2, "High Risk", short_ratio
     
     # [Step 3] 수급(Supply): 메이저 매집 밀도 확인
-    # RPT_MAJOR_POWER, RPT_FND_DAYS, RPT_AVG_PRICE_DEV 기준 적용
     major_pwr = row.get('MAJOR_POWER', 0)
     supply_pass = (
         (major_pwr >= cfg.RPT_MAJOR_POWER) and
@@ -72,7 +66,6 @@ def determine_stage(row):
         return 3, "Major Accumulating", short_ratio
     
     # [Step 4] 응축(Concentration): 기술적 돌파 타점 확정
-    # RPT_PRICE_POS, RPT_MAJOR_DAYS 기준 적용
     concentration_pass = (
         (row.get('고가_20_위치', 0) >= cfg.RPT_PRICE_POS) and
         (row.get('양매수_일수', 0) >= cfg.RPT_MAJOR_DAYS)
@@ -86,7 +79,6 @@ def determine_stage(row):
 def run_full_analysis():
     """
     전체 종목 분석 및 ADB_Step_Tracker.parquet 업데이트
-   
     """
     print(f"🚀 분석 시작 (전략 버전: {cfg.ANA_STRATEGY_VER})")
     
@@ -140,12 +132,7 @@ def run_full_analysis():
     today_df['비고'] = [r[1] for r in results]
     today_df['SNAP_SHORT_RATIO'] = [r[2] for r in results]
 
-    # 4. Tracker 데이터 구성 및 저장 (Open_repo_map_3.md 규격 준수)
-    tracker_cols = [
-        '날짜', '종목코드', '종목명', '시작단계', '종가', 
-        '기금순매수', '공매도평균단가', '거래량'
-    ]
-    
+    # 4. Tracker 데이터 구성 및 저장 (Open_repo_map_8.md 규격 준수)
     # Tracker 칼럼명 매칭 (SNAP_ 접두어 포함)
     tracker_df = today_df[today_df['시작단계'] >= 3].copy() # 3단계 이상만 추적
     tracker_df = tracker_df.rename(columns={
@@ -155,7 +142,7 @@ def run_full_analysis():
         '공매도평균단가': '당시_공매도평단'
     })
     
-    # Config의 스냅샷 리스트 반영[cite: 3]
+    # Config의 스냅샷 리스트 반영
     tracker_df['SNAP_RPT_VOLATILITY_3D'] = tracker_df['수익률_3D']
     tracker_df['SNAP_RPT_MAJOR_POWER'] = tracker_df['MAJOR_POWER']
     tracker_df['SNAP_RPT_PRICE_POS'] = tracker_df['고가_20_위치']
@@ -181,12 +168,12 @@ def run_full_analysis():
             by=['시작단계', '거래대금'], ascending=False
         ).head(50)
         
-        # 데이터 업데이트 로직 (생략 없이 규격대로 작성)
+        # 데이터 업데이트 로직
         wks.clear()
         report_display_json = report_display.copy()
-        # 모든 날짜형 칼럼을 문자열로 변환
+        # 모든 날짜형 칼럼을 문자열로 변환 (Indentation 교정 완료)
         for col in report_display_json.select_dtypes(include=['datetime64[ns]', 'datetime']).columns:
-        report_display_json[col] = report_display_json[col].dt.strftime('%Y-%m-%d')
+            report_display_json[col] = report_display_json[col].dt.strftime('%Y-%m-%d')
 
         wks.update([report_display_json.columns.values.tolist()] + report_display_json.values.tolist())
         print(f"✅ 구글 시트 '{cfg.GS_SHEET_RPT_MAIN}' 업데이트 완료")
