@@ -91,7 +91,7 @@ def refine_krx_data(df, market_label):
     return pd.DataFrame(refined_list)
 
 def update_google_sheet_krx(df, sheet_name, tab_name):
-    """MyPortfolio 파일 내 KRX 시트 업데이트"""
+    """지정된 구글 시트 파일 내 특정 시트 업데이트"""
     creds_json = json.loads(os.environ.get("GCP_CREDENTIALS"))
     gc = gspread.authorize(Credentials.from_service_account_info(creds_json, scopes=["https://www.googleapis.com/auth/drive", "https://spreadsheets.google.com/feeds"]))
     sh = gc.open(sheet_name)
@@ -105,7 +105,7 @@ def update_google_sheet_krx(df, sheet_name, tab_name):
     ws.update([df.columns.values.tolist()] + df.fillna("").values.tolist())
     note = "중요도 순서: 거래정지 > 정리매매 > 관리종목 > 시장경고 > 락/증자/액면변경.\n정상 이외의 상태는 분석 제외 권장."
     ws.update_notes({'F1': note})
-    print(f"✅ {tab_name} 시트 업데이트 및 가이드 메모 완료!")
+    print(f"✅ [{sheet_name}] 파일의 [{tab_name}] 시트 업데이트 완료!")
 
 if __name__ == "__main__":
     # 1. 파일 다운로드
@@ -130,5 +130,6 @@ if __name__ == "__main__":
     df_krx_total.to_parquet(cfg.PATH_MST, index=False)
     print(f"💾 통합 마스터 {cfg.PATH_MST} 저장 완료")
 
-    # 6. 구글 시트 업데이트 (Config 변수 사용)
-    update_google_sheet_krx(df_krx_total, cfg.RPT_PORTFOLIO_NAME, cfg.RPT_SHEET_KRX)
+    # 6. 구글 시트 업데이트 (최신 GS_ 시스템 설정 적용)
+    # [설정 반영]: GS_FILE_USER_PORT("MyPortfolio") 파일의 GS_SHEET_ANA_KRX("KRX") 시트에 기록합니다.
+    update_google_sheet_krx(df_krx_total, cfg.GS_FILE_USER_PORT, cfg.GS_SHEET_ANA_KRX)
