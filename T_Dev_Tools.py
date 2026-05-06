@@ -24,7 +24,7 @@ def generate_repo_map():
         "\n---"
     ]
 
-    # 탐색 디렉토리 설정[cite: 2]
+    # 탐색 디렉토리 설정
     search_dirs = [".", cfg.BASE_DIR, ".github/workflows"]
     
     for d in search_dirs:
@@ -52,7 +52,7 @@ def generate_repo_map():
                 lines.append(f"### 📄 `{item}`")
                 lines.append(f"- **Functions**: {func_str}")
 
-            # 2. 데이터 파일 분석[cite: 2]
+            # 2. 데이터 파일 분석
             elif item.endswith(".parquet"):
                 try:
                     df = pd.read_parquet(path)
@@ -71,7 +71,7 @@ def generate_repo_map():
     
     print(f"✅ {target_file} 가 성공적으로 생성/갱신되었습니다.")
 
-# --- [Tool 2] Strategy Sandbox (시뮬레이션 엔진으로 교체) ---
+# --- [Tool 2] Strategy Sandbox (시뮬레이션 엔진) ---
 def strategy_sandbox(target_date, stock_code=None):
     """
     [Tool 2] 전략 시뮬레이션 샌드박스
@@ -80,6 +80,9 @@ def strategy_sandbox(target_date, stock_code=None):
     """
     print(f"\n🧪 [Strategy Sandbox] 시뮬레이션 모드 (기준 D일: {target_date})")
     print(f"테스트 전략 버전: {cfg.Sim_ANA_STRATEGY_VER}")
+    
+    # 설정된 리포트 파일 정보 출력 (최신 GS_ 설정 반영 확인용)
+    print(f"기록 대상 파일: {cfg.GS_FILE_ANALYZER} / 시트: {cfg.GS_SHEET_ANA_TRACE}")
 
     if not os.path.exists(cfg.PATH_ADB_SUM):
         print(f"❌ 데이터 없음: {cfg.PATH_ADB_SUM}")
@@ -88,8 +91,14 @@ def strategy_sandbox(target_date, stock_code=None):
     # 1. 데이터 로드 및 전처리
     full_df = pd.read_parquet(cfg.PATH_ADB_SUM).sort_values(['종목코드', '날짜'])
     target_dt = pd.to_datetime(target_date)
-    d_minus_1 = full_df[full_df['날짜'] < target_dt]['날짜'].max()
     
+    # 데이터 내 날짜 필터링
+    available_dates = full_df[full_df['날짜'] < target_dt]['날짜']
+    if available_dates.empty:
+        print("❌ 분석 가능한 과거 데이터가 없습니다.")
+        return
+        
+    d_minus_1 = available_dates.max()
     print(f"📊 분석 기준 (D-1): {d_minus_1.strftime('%Y-%m-%d')}")
 
     # 이동평균 계산 (Sim 파라미터 기준 로직)
@@ -109,7 +118,8 @@ def strategy_sandbox(target_date, stock_code=None):
         # Step 3: 수급
         if not (row.get('기금순매수', 0) > 0): return 3
         # Step 4: 응축 (응축 통과 시 최종 추천)
-        price_pos = row.get('종가', 0) / row.get('최고가_20일', 1) # 예시 로직
+        # 예시 로직: 20일 신고가 대비 위치
+        price_pos = row.get('종가', 0) / row.get('최고가_20일', 1) if '최고가_20일' in row else 0.95
         if not (price_pos >= cfg.Sim_RPT_PRICE_POS): return 3.5 
         return 4
 
@@ -153,10 +163,9 @@ def strategy_sandbox(target_date, stock_code=None):
     if summary['T+5'] < summary['T+1']:
         print(f"💡 [제언] 보유 기간 증가 시 수익 하락. Sim_RPT_EXIT_RATIO ({cfg.Sim_RPT_EXIT_RATIO}) 상향으로 익절 구간 단축 제언.")
     
-    # 상관관계 분석 예시 (데이터가 충분할 경우)
     print(f"💡 [추가] 현재 {len(rec_codes)}개 샘플 분석 완료. 승률 60% 미만 시 리스크 임계값 하향 권장.")
 
-# --- [Tool 3] Data Check (수정 요청 반영) ---
+# --- [Tool 3] Data Check ---
 def data_check(file_name=None):
     """
     [Tool 3] Data Check: Parquet 파일의 최신 데이터 5개를 세로로 출력
@@ -187,8 +196,7 @@ def data_check(file_name=None):
     try:
         df = pd.read_parquet(file_path)
         
-        # 날짜 관련 컬럼 탐색 후 정렬[cite: 2]
-        # repo_map.md 상 '날짜' 또는 '일자' 컬럼이 존재함
+        # 날짜 관련 컬럼 탐색 후 정렬
         date_cols = [c for c in df.columns if '날짜' in c or '일자' in c]
         if date_cols:
             df = df.sort_values(by=date_cols[0], ascending=False)
