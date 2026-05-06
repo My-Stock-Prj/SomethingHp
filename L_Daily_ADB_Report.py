@@ -8,13 +8,13 @@ import L_Daily_PQ as pq  # 구글 시트 클라이언트 획득을 위해 임포
 
 def get_macro_score():
     """
-    C_Global_Config.py의 MACRO_WEIGHT 설정에 따라 지수 가중치 계산[cite: 3, 4]
-    개편사항: 날짜 정렬 후 최신 데이터 추출 및 가로형 구조 반환 준비[cite: 6]
+    C_Global_Config.py의 MACRO_WEIGHT 설정에 따라 지수 가중치 계산[cite: 3]
+    개편사항: 날짜 정렬 후 최신 데이터 추출 및 가로형 구조 반환 준비
     """
     try:
         idx_df = pd.read_parquet(cfg.PATH_INDEX)
         if not idx_df.empty:
-            # 날짜순 정렬 후 가장 최신행 추출[cite: 6]
+            # 날짜순 정렬 후 가장 최신행 추출
             idx_df = idx_df.sort_values(by='날짜', ascending=True)
             return idx_df.iloc[-1]
         return None
@@ -24,13 +24,13 @@ def get_macro_score():
 
 def determine_stage(row):
     """
-    C_Global_Config.py Ver 4.2의 RPT_ 파라미터를 기준으로 종목의 단계를 판정[cite: 4, 6]
+    C_Global_Config.py Ver 4.2의 RPT_ 파라미터를 기준으로 종목의 단계를 판정
     """
-    # [Step 1] 에너지 체크: Ver 4.2 RPT_VOL_INTENSITY (2.0) 적용[cite: 6]
+    # [Step 1] 에너지 체크: Ver 4.2 RPT_VOL_INTENSITY (2.0) 적용
     avg_val_20 = row.get('거래대금_20평균', 1)
     energy_pass = (row.get('거래대금', 0) >= (avg_val_20 * cfg.RPT_VOL_INTENSITY))
     
-    # [Step 2] 세이프티 체크: Ver 4.2 RPT_CREDIT_LIMIT(8.0), RPT_SHORT_RATIO(0.1) 적용[cite: 6]
+    # [Step 2] 세이프티 체크: Ver 4.2 RPT_CREDIT_LIMIT(8.0), RPT_SHORT_RATIO(0.1) 적용
     curr_vol = row.get('거래량', 0)
     short_qty = row.get('공매도수량', 0)
     short_ratio = (short_qty / curr_vol) if curr_vol > 0 else 0
@@ -40,16 +40,16 @@ def determine_stage(row):
     if not energy_pass: return 1, "Low Energy", short_ratio
     if not safety_pass: return 2, "High Risk", short_ratio
     
-    # [Step 3] 수급 및 평단 체크: Ver 4.2 RPT_MAJOR_POWER(0.10) 등 반영[cite: 6]
+    # [Step 3] 수급 및 평단 체크: Ver 4.2 RPT_MAJOR_POWER(0.10) 등 반영
     supply_pass = (row.get('기금순매수', 0) > 0) 
     if not supply_pass: return 3, "Major Accumulating", short_ratio
     
-    # [Step 4] 응축 체크: Ver 4.2 RPT_PRICE_POS(0.95) 기준[cite: 6]
+    # [Step 4] 응축 체크: Ver 4.2 RPT_PRICE_POS(0.95) 기준
     return 4, "Final Breakout", short_ratio
 
 def run_full_analysis():
     """
-    전체 종목 분석, Tracker 저장 및 V3_Report(Today 시트) 업데이트[cite: 3, 4]
+    전체 종목 분석, Tracker 저장 및 리포트 업데이트[cite: 3]
     """
     print(f"🚀 분석 시작 (Ver {cfg.ANA_STRATEGY_VER}): {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
@@ -60,7 +60,7 @@ def run_full_analysis():
     # 1. 데이터 로드 및 시계열 정렬[cite: 3]
     full_df = pd.read_parquet(cfg.PATH_ADB_SUM).sort_values(['종목코드', '날짜'])
     
-    # [수정] 수급 칼럼 개별 분리를 위해 3일 누적 수급 계산 유지[cite: 4]
+    # [수정] 수급 칼럼 개별 분리를 위해 3일 누적 수급 계산 유지
     for m_col in ['외국인순매수', '기관순매수', '기금순매수', '개인순매수']:
         full_df[f'{m_col}_3D'] = full_df.groupby('종목코드')[m_col].transform(lambda x: x.rolling(3).sum())
 
@@ -80,12 +80,14 @@ def run_full_analysis():
     latest_date = full_df['날짜'].max()
     adb_df = full_df[full_df['날짜'] == latest_date].copy()
     
-    # [수정] 요구사항 1: 새로운 Config 정의에 따라 내 종목 리스트 로드 (MyPortfolio > TheList)[cite: 5, 6]
+    # [수정] 요구사항 1: 새로운 Config 정의에 따라 내 종목 리스트 로드 (GS_FILE_USER_PORT > GS_SHEET_USER_LIST)
     my_port_data = pd.DataFrame()
     try:
         client = pq.get_gsheet_client()
-        sh_port = client.open(cfg.GS_FILE_USER_PORT) # "MyPortfolio"
-        ws_port = sh_port.worksheet(cfg.GS_SHEET_USER_LIST) # "TheList"
+        # "MyPortfolio" 파일 열기
+        sh_port = client.open(cfg.GS_FILE_USER_PORT) 
+        # "TheList" 시트 선택
+        ws_port = sh_port.worksheet(cfg.GS_SHEET_USER_LIST) 
         my_port_data = pd.DataFrame(ws_port.get_all_records())
     except Exception as e:
         print(f"⚠️ 내 포트폴리오 로드 실패: {e}")
@@ -171,10 +173,12 @@ def run_full_analysis():
             final_tracker_df = new_df
         final_tracker_df.to_parquet(cfg.PATH_TRACKER, index=False, engine='pyarrow')
 
-    # 6. 구글 시트(V3_Report -> Today) 업데이트[cite: 3, 4]
+    # 6. 구글 시트 업데이트 (GS_FILE_REPORT -> GS_SHEET_RPT_MAIN)[cite: 3]
     try:
-        sh = client.open(cfg.GS_FILE_REPORT) # "V3_Report"
-        worksheet = sh.worksheet(cfg.GS_SHEET_RPT_MAIN) # "Today"
+        # "V3_Report" 파일 열기
+        sh = client.open(cfg.GS_FILE_REPORT) 
+        # "Today" 시트 선택
+        worksheet = sh.worksheet(cfg.GS_SHEET_RPT_MAIN) 
         worksheet.clear()
 
         final_display_data = []
@@ -197,7 +201,7 @@ def run_full_analysis():
             final_display_data.append(port_df.columns.tolist())
             final_display_data.extend(port_df.values.tolist())
         else:
-            final_display_data.append(["MyPortfolio(TheList)에 일치하는 보유 종목이 없습니다."])
+            final_display_data.append([f"{cfg.GS_SHEET_USER_LIST}에 일치하는 보유 종목이 없습니다."])
         final_display_data.append([]) 
 
         # [3. 추천 종목]
@@ -217,4 +221,3 @@ def run_full_analysis():
 
 if __name__ == "__main__":
     run_full_analysis()
-
