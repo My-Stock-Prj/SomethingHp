@@ -4,11 +4,11 @@ import pandas as pd
 import os
 from datetime import datetime
 import C_Global_Config as cfg
-import L_Daily_PQ as pq  # 구글 시트 클라이언트 획득을 위해 임포트[cite: 3]
+import L_Daily_PQ as pq  # 구글 시트 클라이언트 획득을 위해 임포트[cite: 2]
 
 def get_macro_score():
     """
-    C_Global_Config.py의 MACRO_WEIGHT 설정에 따라 지수 가중치 계산[cite: 3]
+    C_Global_Config.py의 MACRO_WEIGHT 설정에 따라 지수 가중치 계산[cite: 2]
     개편사항: 날짜 정렬 후 최신 데이터 추출 및 가로형 구조 반환 준비
     """
     try:
@@ -24,7 +24,7 @@ def get_macro_score():
 
 def determine_stage(row):
     """
-    C_Global_Config.py Ver 4.2의 RPT_ 파라미터를 기준으로 종목의 단계를 판정
+    C_Global_Config.py Ver 4.2의 RPT_ 파라미터를 기준으로 종목의 단계를 판정[cite: 2]
     """
     # [Step 1] 에너지 체크: Ver 4.2 RPT_VOL_INTENSITY (2.0) 적용
     avg_val_20 = row.get('거래대금_20평균', 1)
@@ -49,7 +49,7 @@ def determine_stage(row):
 
 def run_full_analysis():
     """
-    전체 종목 분석, Tracker 저장 및 리포트 업데이트[cite: 3]
+    전체 종목 분석, Tracker 저장 및 리포트 업데이트[cite: 2]
     """
     print(f"🚀 분석 시작 (Ver {cfg.ANA_STRATEGY_VER}): {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
@@ -57,7 +57,7 @@ def run_full_analysis():
         print(f"❌ 원본 데이터 없음: {cfg.PATH_ADB_SUM}")
         return
 
-    # 1. 데이터 로드 및 시계열 정렬[cite: 3]
+    # 1. 데이터 로드 및 시계열 정렬[cite: 2]
     full_df = pd.read_parquet(cfg.PATH_ADB_SUM).sort_values(['종목코드', '날짜'])
     
     # [수정] 수급 칼럼 개별 분리를 위해 3일 누적 수급 계산 유지
@@ -89,6 +89,11 @@ def run_full_analysis():
         # "TheList" 시트 선택
         ws_port = sh_port.worksheet(cfg.GS_SHEET_USER_LIST) 
         my_port_data = pd.DataFrame(ws_port.get_all_records())
+        
+        # [추가] 종목코드 매칭률 향상을 위한 전처리: 문자열 변환 및 6자리 맞춤 (005930 등)
+        if not my_port_data.empty and '종목코드' in my_port_data.columns:
+            my_port_data['종목코드'] = my_port_data['종목코드'].astype(str).str.zfill(6)
+            
     except Exception as e:
         print(f"⚠️ 내 포트폴리오 로드 실패: {e}")
 
@@ -103,7 +108,7 @@ def run_full_analysis():
         avg_volume_20 = row.get('거래량_20평균', 1)
         vol_ratio = round(row.get('거래량', 0) / avg_volume_20, 2) if avg_volume_20 > 0 else 0
         
-        # Tracker 저장 (기존 유지)
+        # Tracker 저장 (기존 유지)[cite: 2]
         tracker_entry = {
             '시작날짜': latest_date, '종목코드': row['종목코드'], '종목명': row['종목명'],
             '시작단계': stage_num, '시작종가': row.get('종가', 0),
@@ -118,9 +123,9 @@ def run_full_analysis():
             tracker_entry[f'SNAP_{cfg_col}'] = getattr(cfg, cfg_col, 0)
         tracker_rows.append(tracker_entry)
         
-        # 내 포트폴리오 분석
-        if not my_port_data.empty and row['종목명'] in my_port_data['종목명'].values:
-            port_info = my_port_data[my_port_data['종목명'] == row['종목명']].iloc[0]
+        # [수정 핵심] 내 포트폴리오 분석: 종목명 대신 종목코드를 기준으로 비교[cite: 2]
+        if not my_port_data.empty and row['종목코드'] in my_port_data['종목코드'].values:
+            port_info = my_port_data[my_port_data['종목코드'] == row['종목코드']].iloc[0]
             avg_price = port_info.get('평균단가', 0)
             profit_rate = round((row.get('종가', 0) - avg_price) / avg_price * 100, 2) if avg_price > 0 else 0
             
@@ -138,13 +143,13 @@ def run_full_analysis():
                 '수익률(%)': profit_rate, '오늘전략': today_action, '이유/비고': sell_reason
             })
 
-        # 추천 종목 상세화
+        # 추천 종목 상세화[cite: 2]
         if stage_num == 4:
             caution_msg = "정상"
             if vol_ratio >= cfg.RPT_VOL_EXPLOSION: caution_msg = "거래폭발(주의)"
             elif row.get('신용잔고율', 0) >= cfg.RPT_CREDIT_LIMIT * 0.9: caution_msg = "신용과다"
 
-            # [수정] 요구사항 3: 추천매수가를 5일 이동평균가로 반영
+            # [수정] 요구사항 3: 추천매수가를 5일 이동평균가로 반영[cite: 2]
             ma5_price = int(row.get('종가_5평균', row.get('종가', 0)))
 
             recommended_rows.append({
@@ -159,7 +164,7 @@ def run_full_analysis():
                 '개인(3D)': int(row.get('개인순매수_3D', 0))
             })
 
-    # 5. Tracker 저장 (기존 유지)
+    # 5. Tracker 저장 (기존 유지)[cite: 2]
     if tracker_rows:
         new_df = pd.DataFrame(tracker_rows)
         new_df['시작날짜'] = pd.to_datetime(new_df['시작날짜']) 
@@ -173,11 +178,11 @@ def run_full_analysis():
             final_tracker_df = new_df
         final_tracker_df.to_parquet(cfg.PATH_TRACKER, index=False, engine='pyarrow')
 
-    # 6. 구글 시트 업데이트 (GS_FILE_REPORT -> GS_SHEET_RPT_MAIN)[cite: 3]
+    # 6. 구글 시트 업데이트 (GS_FILE_REPORT -> GS_SHEET_RPT_MAIN)[cite: 2]
     try:
-        # "V3_Report" 파일 열기
+        # "V3_Report" 파일 열기[cite: 2]
         sh = client.open(cfg.GS_FILE_REPORT) 
-        # "Today" 시트 선택
+        # "Today" 시트 선택[cite: 2]
         worksheet = sh.worksheet(cfg.GS_SHEET_RPT_MAIN) 
         worksheet.clear()
 
@@ -185,7 +190,7 @@ def run_full_analysis():
         final_display_data.append([f"★ ADB 시장 분석 리포트 ({latest_date.strftime('%Y-%m-%d')}) ★"])
         final_display_data.append([])
 
-        # [1. 매크로 지표]
+        # [1. 매크로 지표][cite: 2]
         final_display_data.append(["[ 1. 주요 매크로 지표 분석 ]"])
         if macro_data is not None:
             idx_keys = list(macro_data.index)
@@ -194,7 +199,7 @@ def run_full_analysis():
             final_display_data.append(idx_vals)
         final_display_data.append([]) 
 
-        # [2. 내 포트폴리오 진단]
+        # [2. 내 포트폴리오 진단][cite: 2]
         final_display_data.append(["[ 2. 내 포트폴리오 실시간 진단 ]"])
         if my_portfolio_rows:
             port_df = pd.DataFrame(my_portfolio_rows)
@@ -204,7 +209,7 @@ def run_full_analysis():
             final_display_data.append([f"{cfg.GS_SHEET_USER_LIST}에 일치하는 보유 종목이 없습니다."])
         final_display_data.append([]) 
 
-        # [3. 추천 종목]
+        # [3. 추천 종목][cite: 2]
         final_display_data.append(["[ 3. 오늘 최고의 추천종목 (Stage 4 - Final Breakout) ]"])
         if recommended_rows:
             rec_df = pd.DataFrame(recommended_rows)
