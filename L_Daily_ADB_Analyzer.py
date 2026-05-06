@@ -111,30 +111,30 @@ class StrategyAnalyzer:
         return diag_results
 
     def update_trace_sheet(self, df_perf):
-        """구글 시트 Trace 업데이트 (V3_Report 파일 내 cfg.RPT_TRACE_SHEET 참조)"""
+        """구글 시트 Trace 업데이트 (최신 GS_ 표준 설정 참조)"""
         if df_perf is None or df_perf.empty: return
         
         client = self.get_gsheet_client()
         
-        # [정렬 로직] MyPortfolio 파일에서 보유 종목 리스트 확보
+        # [정렬 로직] 최신 Config 정의 파일에서 보유 종목 리스트 확보
         try:
-            portfolio_doc = client.open("MyPortfolio") 
-            port_sh = portfolio_doc.worksheet(cfg.RPT_SHEET_PORT) 
+            portfolio_doc = client.open(cfg.GS_FILE_USER_PORT) 
+            port_sh = portfolio_doc.worksheet(cfg.GS_SHEET_USER_LIST) 
             holding_list = port_sh.col_values(2) # 종목명이 있는 B열 기준
         except Exception as e:
-            print(f"⚠️ MyPortfolio 참조 실패: {e}")
+            print(f"⚠️ {cfg.GS_FILE_USER_PORT} 참조 실패: {e}")
             holding_list = []
 
         # 보유 여부(0:보유, 1:미보유) 및 날짜 내림차순 정렬
         df_perf['IS_HOLDING'] = df_perf['종목'].apply(lambda x: 0 if x in holding_list else 1)
         df_perf = df_perf.sort_values(by=['IS_HOLDING', '날짜'], ascending=[True, False]).drop(columns=['IS_HOLDING'])
 
-        # [핵심 수정] Trace 시트 기록 대상을 V3_Report로 변경
-        report_doc = client.open(cfg.RPT_GSHEET_NAME) # "V3_Report" 오픈
+        # [핵심 수정] 기록 대상 파일과 시트명을 최신 GS_ 변수로 변경
+        report_doc = client.open(cfg.GS_FILE_ANALYZER) 
         try:
-            trace_sh = report_doc.worksheet(cfg.RPT_TRACE_SHEET) # "Trace" 시트
+            trace_sh = report_doc.worksheet(cfg.GS_SHEET_ANA_TRACE) 
         except gspread.exceptions.WorksheetNotFound:
-            trace_sh = report_doc.add_worksheet(title=cfg.RPT_TRACE_SHEET, rows="200", cols="30")
+            trace_sh = report_doc.add_worksheet(title=cfg.GS_SHEET_ANA_TRACE, rows="200", cols="30")
 
         trace_sh.clear()
         
@@ -176,7 +176,7 @@ class StrategyAnalyzer:
         summary_rows.extend(df_display.fillna("-").values.tolist())
 
         trace_sh.update(values=summary_rows, range_name='A1', value_input_option=ValueInputOption.user_entered)
-        print(f"✅ [{cfg.ANA_STRATEGY_VER}] {cfg.RPT_GSHEET_NAME} > {cfg.RPT_TRACE_SHEET} 업데이트 완료.")
+        print(f"✅ [{cfg.ANA_STRATEGY_VER}] {cfg.GS_FILE_ANALYZER} > {cfg.GS_SHEET_ANA_TRACE} 업데이트 완료.")
 
     def run(self):
         df_perf = self.calculate_performance()
