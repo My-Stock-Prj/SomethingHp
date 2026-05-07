@@ -8,7 +8,7 @@ import L_Daily_PQ as pq  # 구글 시트 클라이언트 획득을 위해 임포
 
 def get_macro_score():
     """
-    C_Global_Config.py의 MACRO_WEIGHT 설정에 따라 지수 가중치 계산[cite: 2]
+    C_Global_Config.py의 MACRO_WEIGHT 설정에 따라 지수 가중치 계산
     개편사항: 날짜 정렬 후 최신 데이터 추출 및 가로형 구조 반환 준비
     """
     try:
@@ -24,7 +24,7 @@ def get_macro_score():
 
 def determine_stage(row):
     """
-    C_Global_Config.py Ver 4.2의 RPT_ 파라미터를 기준으로 종목의 단계를 판정[cite: 2]
+    C_Global_Config.py Ver 4.2의 RPT_ 파라미터를 기준으로 종목의 단계를 판정
     4단계 Waterfall 구조 적용 (에너지 -> 세이프티 -> 수급 -> 응축)
     """
     # [Step 1] 에너지(Energy) 체크: 거래대금 강도 및 RS 스코어
@@ -75,7 +75,7 @@ def determine_stage(row):
 
 def run_full_analysis():
     """
-    전체 종목 분석, Tracker 저장 및 리포트 업데이트[cite: 2]
+    전체 종목 분석, Tracker 저장 및 리포트 업데이트
     """
     print(f"🚀 분석 시작 (Ver {cfg.ANA_STRATEGY_VER}): {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
@@ -130,42 +130,39 @@ def run_full_analysis():
     # [디버깅 추가] ADB 데이터 로드 확인
     print(f"🔍 [DEBUG] 시장 데이터(ADB) 로드 완료: {len(adb_df)}개 종목 (기준일: {latest_date})")
 
-    # [수정] 보유 종목 로드 및 상세 디버깅
+    # [검토 및 수정] 보유 종목 로드 및 상세 디버깅 (TheList 시트명 및 대소문자 철저 준수)
     my_port_data = pd.DataFrame()
     try:
         client = pq.get_gsheet_client()
         sh_port = client.open(cfg.GS_FILE_USER_PORT) 
-        ws_port = sh_port.worksheet(cfg.GS_SHEET_USER_LIST) 
+        # Report_1.py 지식 참조: 'TheList' 대소문자 정확히 매칭
+        ws_port = sh_port.worksheet("TheList") 
         
         # 전체 데이터 로드
         raw_records = ws_port.get_all_records()
         my_port_data = pd.DataFrame(raw_records)
         
-        print(f"🔍 [DEBUG] 구글시트 '{cfg.GS_SHEET_USER_LIST}' 로드 성공 (행 수: {len(my_port_data)})")
+        print(f"🔍 [DEBUG] 구글시트 'TheList' 로드 성공 (행 수: {len(my_port_data)})")
         
         if not my_port_data.empty:
-            # 컬럼명 확인 디버깅
-            print(f"🔍 [DEBUG] 시트 컬럼명 리스트: {my_port_data.columns.tolist()}")
+            # 컬럼명 앞뒤 공백 제거 (Strip 로직 반영)
+            my_port_data.columns = [c.strip() for c in my_port_data.columns]
             
-            # 종목코드 전처리 및 타입 디버깅
+            # 종목코드 전처리 (TheList 시트 내 숫자 텍스트화 및 6자리 zfill)
             if '종목코드' in my_port_data.columns:
-                print(f"🔍 [DEBUG] 전처리 전 종목코드 샘플: {my_port_data['종목코드'].head(3).tolist()}")
-                
-                # [보강된 전처리 로직] 숫자 잘림, 수식 소수점, 특수문자 대응
                 my_port_data['종목코드'] = (
                     my_port_data['종목코드']
                     .astype(str)
-                    .str.replace(r'\.0$', '', regex=True)     # 소수점 제거 (660.0 -> 660)[cite: 2]
-                    .str.replace(r'[^0-9]', '', regex=True)   # 숫자 외 기호 제거 (백틱 등)[cite: 2]
+                    .str.replace(r'\.0$', '', regex=True)     # 소수점 제거
+                    .str.replace(r'[^0-9]', '', regex=True)   # 숫자 외 기호 제거
                     .str.strip()
-                    .str.zfill(6)                             # 6자리 맞춤 (660 -> 000660)[cite: 2]
+                    .str.zfill(6)                             # 6자리 표준화
                 )
-                print(f"🔍 [DEBUG] 전처리 후 종목코드 샘플: {my_port_data['종목코드'].head(3).tolist()}")
             else:
-                print(f"❌ [ERROR] '종목코드' 컬럼을 시트에서 찾을 수 없습니다. 헤더 이름을 확인하세요.")
+                print(f"❌ [ERROR] 'TheList' 시트에서 '종목코드' 컬럼을 찾을 수 없습니다.")
                 
     except Exception as e:
-        print(f"⚠️ 내 포트폴리오 로드 실패: {e}")
+        print(f"⚠️ 내 포트폴리오(TheList) 로드 실패: {e}")
 
     tracker_rows = []
     my_portfolio_rows = []
@@ -196,15 +193,13 @@ def run_full_analysis():
             tracker_entry[f'SNAP_{cfg_col}'] = getattr(cfg, cfg_col, 0)
         tracker_rows.append(tracker_entry)
         
-        # [디버깅] 내 포트폴리오 매칭 로직
+        # [디버깅] 내 포트폴리오 매칭 로직 (타입 일치화 완료)
         if not my_port_data.empty and '종목코드' in my_port_data.columns:
-            # ADB의 종목코드와 내 시트의 종목코드 비교
             if row['종목코드'] in my_port_data['종목코드'].values:
                 match_count += 1
                 port_info = my_port_data[my_port_data['종목코드'] == row['종목코드']].iloc[0]
                 avg_price = port_info.get('평균단가', 0)
                 
-                # 시트에서 평균단가가 숫자가 아닌 경우 예외처리
                 try:
                     avg_price = float(avg_price)
                 except:
@@ -226,7 +221,7 @@ def run_full_analysis():
                     '수익률(%)': profit_rate, '오늘전략': today_action, '이유/비고': sell_reason
                 })
 
-        # 추천 종목 선정 (Stage 4 달성 및 에너지 폭발 확인)
+        # 추천 종목 선정
         if stage_num == 4 and diag_msg == "Final Breakout":
             caution_msg = "정상"
             if vol_ratio >= cfg.RPT_VOL_EXPLOSION: caution_msg = "거래폭발(주의)"
