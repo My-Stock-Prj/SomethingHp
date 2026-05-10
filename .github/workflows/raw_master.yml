@@ -1,0 +1,49 @@
+# raw_master.yml
+name: KRX Raw Master
+
+on:
+  schedule:
+    # 한국시간(KST) 매주 토요일 13:00 -> UTC 매주 토요일 04:00
+    # 분 시 일 월 요일
+    - cron: '0 4 * * 6'
+  workflow_dispatch: # 수동 실행 버튼 활성화
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Build RAW Master and Update GSheet
+        env:
+          # 시크릿 이름을 GCP_CREDENTIALS로 변경
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          # 2. 한국투자증권용 (새로 추가해야 할 부분!)
+          # GitHub Secrets에 저장된 이름과 ${{ secrets.이름 }}이 같아야 합니다.
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ENV_DV: ${{ secrets.KIS_ENV_DV }}
+        run: python build_raw_master.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add DB/raw_mst_krx_full.parquet
+          git commit -m "Update RAW Master DB: $(date +'%Y-%m-%d')" || echo "No changes to commit"
+          git push

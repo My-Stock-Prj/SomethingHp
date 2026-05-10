@@ -1,0 +1,54 @@
+# 이 코드의 이름은 raw_PQ_run.yml
+name: raw_daily_PQ
+
+on:
+  workflow_dispatch: # 수동 실행
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Parquet 엔진(pyarrow)과 필수 라이브러리를 명시적으로 설치
+          pip install pandas pyarrow requests gspread google-auth
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Build Daily Price PQ
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+          DATA_BASE_DIR: ./DB
+        run: python build_raw_PQ.py
+
+      - name: Verify Data Integrity
+        env:
+          DATA_BASE_DIR: ./DB
+        run: |
+          if [ -f T_Dev_Tools.py ]; then
+            python T_Dev_Tools.py
+          else
+            echo "⚠️ T_Dev_Tools.py 가 존재하지 않아 검증 단계를 건너뜁니다."
+          fi
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add DB/*.parquet repo_map.md || echo "No files to add"
+          git commit -m "Update Daily Price PQ and Repo Map: $(date +'%Y-%m-%d')" || echo "No changes to commit"
+          git push
