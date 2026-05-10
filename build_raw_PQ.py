@@ -170,9 +170,9 @@ def main():
             return
 
         # 2. 최근 20영업일(평일) 날짜 리스트 생성
-        end_dt = datetime.now().strftime('%Y%m%d')
-        date_list = pd.bdate_range(end=end_dt, periods=20).strftime('%Y%m%d').tolist()
-        print(f"📅 수집 기간: {date_list[0]} ~ {date_list[-1]} (총 {len(date_list)}영업일)")
+        date_list = pd.bdate_range(end=datetime.now(), periods=20).strftime('%Y%m%d').tolist()
+        target_dates = date_list[:10]  # 앞부분 10일만 선택
+        print(f"📅 1차 수집 기간: {target_dates[0]} ~ {target_dates[-1]}")
         
         collected = []
         total_tickers = len(tickers)
