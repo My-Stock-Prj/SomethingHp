@@ -129,9 +129,9 @@ def _url_fetch(url, headers, tr_id, params=None, is_post=False):
     if _env is None: _env = getTREnv()
     
     # ---------------------------------------------------------
-    # [추가] 공통 속도 제한: 모든 요청 전 0.12초 대기
+    # [추가] 공통 속도 제한: 모든 요청 전 0.07초 대기
     # ---------------------------------------------------------
-    time.sleep(0.12)
+    time.sleep(0.07)
 
     # 토큰 유실 방어
     if not _env.access_token:
