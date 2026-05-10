@@ -226,10 +226,11 @@ def get_stock_base_info(stock_code):
     res = _url_fetch(url, {}, tr_id, params, is_post=False)
     return res.getBody()
 
-# [추가] 일별 차트 시세 조회 전용 함수 (사용자 요청 정책 반영)
+# [수정] 일별 차트 시세 조회 전용 함수 (20일 등 기간 조회 대응)
 def get_daily_price(stock_code, start_date, end_date):
     """
     국내주식 일별 차트 시세 조회 (FHKST03010100)
+    - 기간 조회 지원 (start_date ~ end_date)
     - 수정주가 미반영 (FID_ORG_ADJ_PRC: 1) 고정
     """
     url = "/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
@@ -247,10 +248,11 @@ def get_daily_price(stock_code, start_date, end_date):
     res = _url_fetch(url, {}, tr_id, params, is_post=False)
     return res.getBody()
 
-# [추가] Step 1: 종목별 투자자 매매동향(일별) 조회 전용 함수 (FHPTJ04160001)
+# [유지] Step 1: 종목별 투자자 매매동향(일별) 조회 전용 함수 (FHPTJ04160001)
 def get_investor_trade(stock_code, target_date):
     """
     국내주식 종목별 투자자 매매동향(일별) 조회 (FHPTJ04160001)
+    - 단일 일자 호출 유지
     """
     url = "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily"
     tr_id = "FHPTJ04160001"
@@ -268,10 +270,11 @@ def get_investor_trade(stock_code, target_date):
     res = _url_fetch(url, {}, tr_id, params, is_post=False)
     return res.getBody()
 
-# [추가] 종목별 프로그램매매추이(일별) 조회 전용 함수 (FHPPG04650201)
+# [유지] 종목별 프로그램매매추이(일별) 조회 전용 함수 (FHPPG04650201)
 def get_program_trade(stock_code, target_date):
     """
     국내주식 종목별 프로그램매매추이(일별) 조회 (FHPPG04650201)
+    - 단일 일자 호출 유지
     """
     url = "/uapi/domestic-stock/v1/quotations/program-trade-by-stock-daily"
     tr_id = "FHPPG04650201"
@@ -288,10 +291,11 @@ def get_program_trade(stock_code, target_date):
     res = _url_fetch(url, {}, tr_id, params, is_post=False)
     return res.getBody()
 
-# [추가] 국내주식 공매도 일별추이 조회 (FHPST04830000)
-def get_short_sale_daily(stock_code, target_date):
+# [수정] 국내주식 공매도 일별추이 조회 (20일 등 기간 조회 대응)
+def get_short_sale_daily(stock_code, start_date, end_date):
     """
     국내주식 공매도 일별추이 (FHPST04830000)
+    - 기간 조회 지원 (start_date ~ end_date)
     """
     url = "/uapi/domestic-stock/v1/quotations/daily-short-sale"
     tr_id = "FHPST04830000"
@@ -299,16 +303,17 @@ def get_short_sale_daily(stock_code, target_date):
         "FID_COND_MRKT_DIV_CODE": "J",
         "FID_INPUT_ISCD": stock_code,
         "FID_PERIOD_DIV_CODE": "D",
-        "FID_INPUT_DATE_1": target_date,
-        "FID_INPUT_DATE_2": target_date
+        "FID_INPUT_DATE_1": start_date,
+        "FID_INPUT_DATE_2": end_date
     }
     res = _url_fetch(url, {}, tr_id, params, is_post=False)
     return res.getBody()
 
-# [추가] 종목별 일별 대차거래추이 조회 (HHPST074500C0)
+# [유지] 종목별 일별 대차거래추이 조회 (HHPST074500C0)
 def get_loan_trans_daily(stock_code, target_date):
     """
     종목별 일별 대차거래추이 (HHPST074500C0)
+    - 단일 일자 호출 유지
     """
     url = "/uapi/domestic-stock/v1/quotations/daily-loan-trans"
     tr_id = "HHPST074500C0"
@@ -322,20 +327,21 @@ def get_loan_trans_daily(stock_code, target_date):
     res = _url_fetch(url, {}, tr_id, params, is_post=False)
     return res.getBody()
 
-# [추가] 국내주식 신용잔고 일별추이 조회 (FHPST04760000)
-def get_credit_balance_daily(stock_code, target_date):
+# [수정] 국내주식 신용잔고 일별추이 조회 (20일 등 기간 조회 대응)
+def get_credit_balance_daily(stock_code, start_date, end_date):
     """
     국내주식 신용잔고 일별추이 (FHPST04760000)
+    - 기간 조회 지원 (start_date ~ end_date)
     """
     url = "/uapi/domestic-stock/v1/quotations/daily-credit-balance"
     tr_id = "FHPST04760000"
     params = {
         "FID_COND_MRKT_DIV_CODE": "J",
-        "FID_COND_SCR_DIV_CODE": "20476", # 추가 (신용잔고 화면번호)
+        "FID_COND_SCR_DIV_CODE": "20476", 
         "FID_INPUT_ISCD": stock_code,
-        "FID_INPUT_DATE_1": target_date,
-        "FID_INPUT_DATE_2": target_date,
-        "FID_ORG_ADJ_PRC": "1"            # 추가
+        "FID_INPUT_DATE_1": start_date,
+        "FID_INPUT_DATE_2": end_date,
+        "FID_ORG_ADJ_PRC": "1"            
     }
     res = _url_fetch(url, {}, tr_id, params, is_post=False)
     return res.getBody()
